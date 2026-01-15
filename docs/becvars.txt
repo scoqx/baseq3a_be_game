@@ -1,0 +1,14 @@
+****************************************************
+******************** be cvars   ********************
+****************************************************
+
+======================== [devotion + modified]
+g_damagePlums <0|1>
+
+    Enables damage plums display - shows damage numbers above players when they take damage.
+    
+    0 - Disabled
+    1 - Enabled (all weapons)
+    
+    Players can control which weapons show damage plums via cg_damagePlums and cg_damagePlumsWeapons client cvars.
+========================

@@ -1272,9 +1272,6 @@ BG_AddPredictableEventToPlayerstate
 Handles the sequence numbers
 ===============
 */
-#ifdef CGAME
-void CG_StoreEvent( entity_event_t ev, int eventParm, int entityNum );
-#endif
 
 void	trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize );
 
@@ -1285,17 +1282,9 @@ void BG_AddPredictableEventToPlayerstate( entity_event_t newEvent, int eventParm
 		char buf[256];
 		trap_Cvar_VariableStringBuffer("showevents", buf, sizeof(buf));
 		if ( atof(buf) != 0 ) {
-#ifdef QAGAME
 			Com_Printf(" game event svt %5d -> %5d: num = %20s parm %d\n", ps->pmove_framecount/*ps->commandTime*/, ps->eventSequence, eventnames[newEvent], eventParm);
-#else
-			Com_Printf("Cgame event svt %5d -> %5d: num = %20s parm %d\n", ps->pmove_framecount/*ps->commandTime*/, ps->eventSequence, eventnames[newEvent], eventParm);
-#endif
 		}
 	}
-#endif
-
-#ifdef CGAME
-	CG_StoreEvent( newEvent, eventParm, entityNum );
 #endif
 	
 	ps->events[ps->eventSequence & (MAX_PS_EVENTS-1)] = newEvent;

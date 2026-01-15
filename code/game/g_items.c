@@ -309,6 +309,10 @@ static int Pickup_Weapon( gentity_t *ent, gentity_t *other ) {
 	//} else {
 	//	return g_weaponRespawn.integer;
 	//}
+	// stats: count weapon pickup
+	if ( other->client && ent->item->giType == IT_WEAPON && ent->item->giTag >= 0 && ent->item->giTag < WP_NUM_WEAPONS ) {
+		other->client->perWeaponPickups[ ent->item->giTag ]++;
+	}
 	return SpawnTime( ent, qfalse );
 }
 
@@ -344,7 +348,10 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 		other->health = max;
 	}
 	other->client->ps.stats[STAT_HEALTH] = other->health;
-
+	// stats: accumulate health picked up
+	if ( other->client ) {
+		if ( quantity == 100 ) other->client->healthMegaCount++;
+	}
 	//if ( ent->item->quantity == 100 ) { // mega health respawns slow
 	//	return RESPAWN_MEGAHEALTH;
 	//} else {
@@ -378,7 +385,12 @@ int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 		other->client->ps.stats[STAT_ARMOR] = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
 	}
 #endif
-
+	// stats: accumulate armor pickups, and categorize counts if possible
+	if ( other->client ) {
+		if ( ent->item->quantity == 50 ) other->client->armorYACount++;
+		else if ( ent->item->quantity == 100 ) other->client->armorRACount++;
+		else if ( ent->item->quantity == 25 ) other->client->armorGACount++;
+	}
 	return SpawnTime( ent, qfalse ); // return RESPAWN_ARMOR;
 }
 
@@ -683,7 +695,14 @@ gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 	AngleVectors( angles, velocity, NULL, NULL );
 	VectorScale( velocity, 150, velocity );
 	velocity[2] += 200 + crandom() * 50;
-	
+
+	if ( item->giType == IT_WEAPON && ent->client ) {
+		int weaponIdx = item->giTag;
+		if ( weaponIdx >= 0 && weaponIdx < WP_NUM_WEAPONS ) {
+			ent->client->perWeaponDrops[weaponIdx]++;
+		}
+	}
+
 	return LaunchItem( item, ent->s.pos.trBase, velocity );
 }
 

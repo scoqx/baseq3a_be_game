@@ -48,6 +48,125 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 }
 
 /*
+============
+MOD_ToWeaponBit
+
+Convert means of death (MOD_*) to weapon bitmask value
+Returns 0 if mod doesn't correspond to a weapon
+============
+*/
+static int MOD_ToWeaponBit( int mod ) {
+	switch( mod ) {
+		case MOD_GAUNTLET:
+			return (1 << 0); // bit 0 = 1
+		case MOD_MACHINEGUN:
+			return (1 << 1); // bit 1 = 2
+		case MOD_SHOTGUN:
+			return (1 << 2); // bit 2 = 4
+		case MOD_GRENADE:
+		case MOD_GRENADE_SPLASH:
+			return (1 << 3); // bit 3 = 8
+		case MOD_ROCKET:
+		case MOD_ROCKET_SPLASH:
+			return (1 << 4); // bit 4 = 16
+		case MOD_LIGHTNING:
+			return (1 << 5); // bit 5 = 32
+		case MOD_RAILGUN:
+			return (1 << 6); // bit 6 = 64
+		case MOD_PLASMA:
+		case MOD_PLASMA_SPLASH:
+			return (1 << 7); // bit 7 = 128
+		case MOD_BFG:
+		case MOD_BFG_SPLASH:
+			return (1 << 8); // bit 8 = 256
+#ifdef MISSIONPACK
+		case MOD_NAIL:
+			return (1 << 9); // bit 9 = 512
+		case MOD_CHAINGUN:
+			return (1 << 10); // bit 10 = 1024
+		case MOD_PROXIMITY_MINE:
+			return (1 << 11); // bit 11 = 2048
+#endif
+		default:
+			return 0;
+	}
+}
+
+void DamagePlum( gentity_t *ent, gentity_t *target, int mod, int damage ) {
+	gentity_t *plum;
+	vec3_t origin;
+	int weaponBit;
+
+	// Early exit if client doesn't exist or damage plums are disabled
+	if (!ent->client || ent->client->pers.damagePlums == 0) {
+		return;
+	}
+	
+	// Check weapon filter if damagePlums is 1 or 2
+	if (ent->client->pers.damagePlums == 1 || ent->client->pers.damagePlums == 2) {
+		weaponBit = MOD_ToWeaponBit( mod );
+		// If weapon filter is set and this weapon is not in the mask, skip
+		if (ent->client->pers.damagePlumsWeapons != 0 && (ent->client->pers.damagePlumsWeapons & weaponBit) == 0) {
+			return;
+		}
+	}
+	
+	// use server command for these damage types
+	if ( mod == MOD_GRENADE || mod == MOD_GRENADE_SPLASH || mod == MOD_ROCKET || mod == MOD_ROCKET_SPLASH )	{
+		return;
+	}
+
+	VectorCopy(target->r.currentOrigin, origin);
+	origin[2] += 2 * target->r.maxs[2];
+
+	plum = G_TempEntity( origin, EV_DAMAGEPLUM );
+	// only send this temp entity to a single client
+	plum->r.svFlags |= SVF_SINGLECLIENT;
+	plum->r.singleClient = ent->s.number;
+	//
+	plum->s.otherEntityNum = ent->s.number;
+	plum->s.time = damage;
+}
+
+/*
+============
+DamagePlumSC
+
+Send damage plum via server command for projectile weapons (GL/RL)
+This bypasses SVF limitations by using direct server command
+============
+*/
+void DamagePlumSC( gentity_t *ent, gentity_t *target, int mod, int damage ) {
+	vec3_t origin;
+	int weaponBit;
+
+	// Early exit if client doesn't exist or damage plums are disabled
+	if (!ent->client || ent->client->pers.damagePlums == 0) {
+		return;
+	}
+	
+	// only use server command for projectile weapons
+	if ( mod != MOD_GRENADE && mod != MOD_GRENADE_SPLASH && mod != MOD_ROCKET && mod != MOD_ROCKET_SPLASH ) {
+		return;
+	}
+
+	// Check weapon filter if damagePlums is 1 or 2
+	if (ent->client->pers.damagePlums == 1 || ent->client->pers.damagePlums == 2) {
+		weaponBit = MOD_ToWeaponBit( mod );
+		// If weapon filter is set and this weapon is not in the mask, skip
+		if (ent->client->pers.damagePlumsWeapons != 0 && (ent->client->pers.damagePlumsWeapons & weaponBit) == 0) {
+			return;
+		}
+	}
+
+	VectorCopy(target->r.currentOrigin, origin);
+	origin[2] += 2 * target->r.maxs[2];
+
+	// Send server command with damage and coordinates
+	trap_SendServerCommand( ent->s.number, va("dmgplum_proj %d %f %f %f", damage, origin[0], origin[1], origin[2]) );
+}
+
+/*
 =================
 TossClientItems
 
@@ -466,6 +585,15 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	self->enemy = attacker;
 
 	self->client->ps.persistant[PERS_KILLED]++;
+
+	/* Count suicides: self-kill, world/hazard death, or explicit MOD_SUICIDE */
+	if ( self->client ) {
+		if ( (attacker && attacker->client && attacker == self)
+			 || (meansOfDeath == MOD_SUICIDE)
+			 || (killer == ENTITYNUM_WORLD) ) {
+			self->client->suicides++;
+		}
+	}
 
 	if (attacker && attacker->client) {
 		attacker->client->lastkilled_client = self->s.number;
@@ -1012,10 +1140,28 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		// so usual PERS_HITS increments/decrements could result in ZERO delta
 		if ( OnSameTeam( targ, attacker ) ) {
 			attacker->client->damage.team++;
+			// stats: team damage
+			attacker->client->teamDamageGiven += take + asave;
 		} else {
+			int weaponForStats;
+			int weaponFromMod;
 			attacker->client->damage.enemy++;
 			// accumulate damage during server frame
 			attacker->client->damage.amount += take + asave;
+			// stats: attribute damage by current weapon on attacker snapshot
+			attacker->client->totalDamageGiven += take + asave;
+			// use weapon from inflictor (missile) if it's a missile, or from mod parameter if negative, otherwise from attacker
+			weaponFromMod = (mod < 0) ? -mod : 0;
+			weaponForStats = (inflictor && inflictor->s.eType == ET_MISSILE) ? inflictor->s.weapon : 
+							(weaponFromMod > WP_NONE && weaponFromMod < WP_NUM_WEAPONS) ? weaponFromMod : attacker->s.weapon;
+			if ( weaponForStats < 0 || weaponForStats >= WP_NUM_WEAPONS ) weaponForStats = WP_NONE;
+			if ( weaponForStats >= 0 && weaponForStats < WP_NUM_WEAPONS ) {
+				attacker->client->perWeaponHits[ weaponForStats ]++;
+			}
+		}
+		// stats: track damage taken
+		if ( client ) {
+			client->totalDamageTaken += take + asave;
 		}
 #endif
 	}
@@ -1058,6 +1204,16 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	// do the damage
 	if (take) {
+		if ( g_damagePlums.integer && damage > 0 && targ->client && targ != attacker && targ->health > 0) {
+			if (mod == MOD_SHOTGUN) {
+				targ->client->shotgunDamagePlumDmg += damage;
+			} else if (mod == MOD_GRENADE || mod == MOD_GRENADE_SPLASH || mod == MOD_ROCKET || mod == MOD_ROCKET_SPLASH) {
+				DamagePlumSC(attacker, targ, mod, damage);
+			} else {
+				DamagePlum(attacker, targ, mod, damage);
+			}
+		}
+
 		targ->health = targ->health - take;
 		if ( targ->client ) {
 			targ->client->ps.stats[STAT_HEALTH] = targ->health;
@@ -1071,6 +1227,26 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 				targ->health = -999;
 
 			targ->enemy = attacker;
+			// increment deaths / kills
+			if ( targ->client ) {
+				targ->client->deaths++;
+			}
+			if ( attacker && attacker->client && attacker != targ && !OnSameTeam(targ, attacker) ) {
+				int weaponForStats;
+				int weaponFromMod;
+				attacker->client->kills++;
+				/* attribute per-weapon kill to weapon that caused the damage */
+				weaponFromMod = (mod < 0) ? -mod : 0;
+				weaponForStats = (inflictor && inflictor->s.eType == ET_MISSILE) ? inflictor->s.weapon : 
+								(weaponFromMod > WP_NONE && weaponFromMod < WP_NUM_WEAPONS) ? weaponFromMod : attacker->s.weapon;
+				if ( weaponForStats >= 0 && weaponForStats < WP_NUM_WEAPONS ) {
+					attacker->client->perWeaponKills[ weaponForStats ]++;
+				}
+			}
+			// increment team kills
+			if ( attacker && attacker->client && attacker != targ && OnSameTeam(targ, attacker) ) {
+				attacker->client->teamKills++;
+			}
 			targ->die (targ, inflictor, attacker, take, mod);
 			return;
 		} else if ( targ->pain ) {

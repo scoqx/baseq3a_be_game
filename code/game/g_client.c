@@ -627,7 +627,7 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	// set name
 	Q_strncpyz( oldname, client->pers.netname, sizeof( oldname ) );
 	s = Info_ValueForKey( userinfo, "name" );
-	BG_CleanName( s, client->pers.netname, sizeof( client->pers.netname ), "UnnamedPlayer" );
+	BG_CleanNameEx( s, client->pers.netname, sizeof( client->pers.netname ), "^0U^7nnamed^0P^7layer", qtrue );
 
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ) {
@@ -681,6 +681,17 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 		client->pers.teamInfo = qfalse;
 	}
 #endif
+
+	// BE
+	s = Info_ValueForKey( userinfo, "cg_damagePlums" );
+	if ( !atoi( s ) ) {
+		client->pers.damagePlums = 0;
+	} else {
+		client->pers.damagePlums = atoi( s );
+	}
+	
+	s = Info_ValueForKey( userinfo, "cg_damagePlumsWeapons" );
+	client->pers.damagePlumsWeapons = atoi( s );
 
 	// set model
 	Q_strncpyz( model, Info_ValueForKey( userinfo, "model" ), sizeof( model ) );

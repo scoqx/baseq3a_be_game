@@ -1,9 +1,9 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
-// bg_public.h -- definitions shared by both the server game and client game modules
+// bg_public.h -- definitions for the server game module
 
 // because games can change separately from the main system version, we need a
-// second version that must match between game and cgame
+// version number
 
 #define	GAME_VERSION		"baseq3-1"
 
@@ -174,7 +174,6 @@ typedef struct {
 	int			pmove_msec;
 
 	// callbacks to test the world
-	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
 	int			(*pointcontents)( const vec3_t point, int passEntityNum );
 } pmove_t;
@@ -198,7 +197,7 @@ typedef enum {
 	STAT_ARMOR,				
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
-	STAT_MAX_HEALTH					// health / armor limit, changable by handicap
+	STAT_MAX_HEALTH,					// health / armor limit, changable by handicap
 } statIndex_t;
 
 
@@ -625,6 +624,7 @@ char *EncodedString( const char *str );
 char *DecodedString( const char *str );
 
 void BG_CleanName( const char *in, char *out, int outSize, const char *blankString );
+void BG_CleanNameEx(const char *in, char *out, int outSize, const char *blankString, qboolean keepColorCodes);
 char *BG_StripColor( char *string );
 
 void Q_strcpy( char *dst, const char *src );

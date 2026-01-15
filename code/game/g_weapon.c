@@ -277,7 +277,51 @@ SHOTGUN
 // client predicts same spreads
 #define	DEFAULT_SHOTGUN_DAMAGE	10
 
-static qboolean ShotgunPellet( const vec3_t start, const vec3_t end, gentity_t *ent ) {
+struct hitShotgunTargets_s {
+	gentity_t *targets[DEFAULT_SHOTGUN_COUNT];
+	vec3_t hitPoints[DEFAULT_SHOTGUN_COUNT];
+};
+
+static void UpdateShotgunHits(struct hitShotgunTargets_s *list, gentity_t *hittarg, const vec3_t hitPoint) {
+	int i;
+	if (!g_damagePlums.integer || !list || !hittarg) {
+		return;
+	}
+	for (i = 0; i < DEFAULT_SHOTGUN_COUNT; i++) {
+		if (!list->targets[i]) {
+			list->targets[i] = hittarg;
+			VectorCopy(hitPoint, list->hitPoints[i]);
+			if (hittarg->client) {
+				hittarg->client->shotgunDamagePlumDmg = 0;
+			}
+			return;
+		}
+		if (list->targets[i] == hittarg) {
+			return;
+		}
+	}
+}
+
+static void ShotgunDamagePlums(struct hitShotgunTargets_s *list, gentity_t *attacker) {
+	int i;
+	gentity_t *targ;
+
+	if (!g_damagePlums.integer) {
+		return;
+	}
+
+	for (i = 0; i < DEFAULT_SHOTGUN_COUNT; i++) {
+		if (!list->targets[i]) {
+			return;
+		}
+		targ = list->targets[i];
+		if (targ != attacker && targ->client && targ->client->shotgunDamagePlumDmg > 0) {
+			DamagePlum(attacker, targ, MOD_SHOTGUN, targ->client->shotgunDamagePlumDmg);
+		}
+	}
+}
+
+static qboolean ShotgunPellet( const vec3_t start, const vec3_t end, gentity_t *ent, struct hitShotgunTargets_s *hitTargets ) {
 	trace_t		tr;
 	int			damage, i, passent;
 	gentity_t	*traceEnt;
@@ -320,6 +364,7 @@ static qboolean ShotgunPellet( const vec3_t start, const vec3_t end, gentity_t *
 			if ( LogAccuracyHit( traceEnt, ent ) ) {
 				hitClient = qtrue;
 			}
+			UpdateShotgunHits(hitTargets, traceEnt, tr.endpos);
 			G_Damage( traceEnt, ent, ent, forward, tr.endpos, damage, 0, MOD_SHOTGUN );
 			return hitClient;
 #endif
@@ -337,6 +382,7 @@ static void ShotgunPattern( const vec3_t origin, const vec3_t origin2, int seed,
 	vec3_t		end;
 	vec3_t		forward, right, up;
 	qboolean	hitClient = qfalse;
+	struct hitShotgunTargets_s hitTargets = {0};
 
 	// derive the right and up vectors from the forward vector, because
 	// the client won't have any other information
@@ -354,12 +400,13 @@ static void ShotgunPattern( const vec3_t origin, const vec3_t origin2, int seed,
 		VectorMA( origin, ( 8192.0 * 16.0 ), forward, end );
 		VectorMA( end, r, right, end );
 		VectorMA( end, u, up, end );
-		if ( ShotgunPellet( origin, end, ent ) && !hitClient ) {
+		if ( ShotgunPellet( origin, end, ent, &hitTargets ) && !hitClient ) {
 			hitClient = qtrue;
 			ent->client->accuracy_hits++;
 		}
 	}
 
+	ShotgunDamagePlums(&hitTargets, ent);
 	// unlagged
 	G_UndoTimeShiftFor( ent );
 }
@@ -661,7 +708,6 @@ void Weapon_LightningFire( gentity_t *ent ) {
 		// if not the first trace (the lightning bounced of an invulnerability sphere)
 		if (i) {
 			// add bounced off lightning bolt temp entity
-			// the first lightning bolt is a cgame only visual
 			//
 			tent = G_TempEntity( muzzle, EV_LIGHTNINGBOLT );
 			VectorCopy( tr.endpos, end );
@@ -821,11 +867,14 @@ void FireWeapon( gentity_t *ent ) {
 #ifdef MISSIONPACK
 		if( ent->s.weapon == WP_NAILGUN ) {
 			ent->client->accuracy_shots += NUM_NAILSHOTS;
+			ent->client->perWeaponShots[ ent->s.weapon ] += NUM_NAILSHOTS;
 		} else {
 			ent->client->accuracy_shots++;
+			ent->client->perWeaponShots[ ent->s.weapon ]++;
 		}
 #else
 		ent->client->accuracy_shots++;
+		ent->client->perWeaponShots[ ent->s.weapon ]++;
 #endif
 	}
 

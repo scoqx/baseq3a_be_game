@@ -238,6 +238,9 @@ typedef struct {
 	qboolean	teamInfo;			// send team overlay updates?
 	int			voted;
 	int			teamVoted;
+	// BE
+	int			damagePlums;
+	int			damagePlumsWeapons; // bitmask for which weapons show damage plums (from cg_damagePlumsWeapons)
 
 	qboolean	inGame;
 } clientPersistant_t;
@@ -287,6 +290,27 @@ struct gclient_s {
 	int			accuracy_shots;		// total number of shots
 	int			accuracy_hits;		// total number of hits
 
+	// per-client stats (cleared on spawn)
+	int			totalDamageGiven;
+	int			teamDamageGiven;
+	int			totalDamageTaken;
+	int			perWeaponShots[WP_NUM_WEAPONS];
+	int			perWeaponHits[WP_NUM_WEAPONS];
+	int			perWeaponKills[WP_NUM_WEAPONS];
+	int			perWeaponDeaths[WP_NUM_WEAPONS];
+	int			perWeaponPickups[WP_NUM_WEAPONS];
+	int			perWeaponDrops[WP_NUM_WEAPONS];
+	int			kills;
+	int			deaths;
+	int			suicides;
+	int			teamKills;
+
+	// pickups summary
+	int			armorYACount; // 50
+	int			armorRACount; // 100
+	int			armorGACount; // 25
+	int			healthMegaCount; // 100
+
 	//
 	int			lastkilled_client;	// last client that this client killed
 	int			lasthurt_client;	// last client that damaged this client
@@ -334,6 +358,9 @@ struct gclient_s {
 		int		enemy;
 		int		amount;
 	} damage;
+
+	// BE
+	int	shotgunDamagePlumDmg;
 };
 
 
@@ -611,6 +638,8 @@ void InitBodyQue (void);
 void ClientSpawn( gentity_t *ent );
 void player_die (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod);
 void AddScore( gentity_t *ent, vec3_t origin, int score );
+void DamagePlum( gentity_t *ent, gentity_t *target, int mod, int damage );
+void DamagePlumSC( gentity_t *ent, gentity_t *target, int mod, int damage );
 void CalculateRanks( void );
 qboolean SpotWouldTelefrag( gentity_t *spot );
 

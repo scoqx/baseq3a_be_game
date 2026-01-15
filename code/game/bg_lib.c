@@ -1118,6 +1118,69 @@ void BG_CleanName( const char *in, char *out, int outSize, const char *blankStri
 	}
 }
 
+void BG_CleanNameEx(const char *in, char *out, int outSize, const char *blankString, qboolean keepColorCodes) {
+    int len = 0, colorlessLen = 0, spaces = 0;
+    char ch;
+    char *p = out;
+    outSize--;
+    *p = '\0';
+
+    while (1) {
+        ch = *in++;
+        if (!ch) break;
+
+        // don't allow leading spaces
+        if (*p == '\0' && ch <= ' ') continue;
+
+        // color codes handling
+        if (ch == Q_COLOR_ESCAPE && *in) {
+            if (keepColorCodes) {
+                // allow any color code, including black
+                if (len > outSize - 2) break;
+                *out++ = ch;
+                *out++ = *in++;
+                len += 2;
+                continue;
+            } else {
+                // skip color code
+                in++;
+                continue;
+            }
+        }
+
+        // printable range
+        if (ch < ' ' || ch > 126) continue;
+
+        // don't allow too many consecutive spaces
+        if (ch == ' ') {
+            spaces++;
+            if (spaces > 2) continue;
+        } else {
+            spaces = 0;
+        }
+
+        if (len > outSize - 1) break;
+
+        *out++ = ch;
+        colorlessLen++;
+        len++;
+    }
+    *out = '\0';
+
+    if (blankString) {
+        if (*p == '\0' || colorlessLen == 0) {
+            Q_strncpyz(p, blankString, outSize);
+        }
+    }
+
+	// Append ^7 at the end if keepColorCodes is true and there is enough space
+	if (keepColorCodes) {
+		int currLen = (int)strlen(p);
+		if (currLen <= outSize - 3) { // set white color
+			strcpy(&p[currLen], S_COLOR_STRIP);
+		}
+	}
+}
 
 /*
 ===================

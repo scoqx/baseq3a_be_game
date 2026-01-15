@@ -189,7 +189,7 @@ typedef enum {
 #define	MAX_MAP_AREA_BYTES		32		// bit vector of area visibility
 
 
-// print levels from renderer (FIXME: set up for game / cgame?)
+// print levels from renderer
 typedef enum {
 	PRINT_ALL,
 	PRINT_DEVELOPER,		// only print when "developer 1"
@@ -212,7 +212,7 @@ typedef enum {
 } errorParm_t;
 
 
-// font rendering values used by ui and cgame
+// font rendering values (legacy, kept for compatibility)
 
 #define PROP_GAP_WIDTH			3
 #define PROP_SPACE_WIDTH		8
@@ -221,18 +221,6 @@ typedef enum {
 
 #define BLINK_DIVISOR			200
 #define PULSE_DIVISOR			75
-
-#define UI_LEFT			0x00000000	// default
-#define UI_CENTER		0x00000001
-#define UI_RIGHT		0x00000002
-#define UI_FORMATMASK	0x00000007
-#define UI_SMALLFONT	0x00000010
-#define UI_BIGFONT		0x00000020	// default
-#define UI_GIANTFONT	0x00000040
-#define UI_DROPSHADOW	0x00000800
-#define UI_BLINK		0x00001000
-#define UI_INVERSE		0x00002000
-#define UI_PULSE		0x00004000
 
 #if defined(_DEBUG) && !defined(BSPC)
 	#define HUNK_DEBUG
@@ -760,9 +748,7 @@ typedef struct {
 // in order from highest priority to lowest
 // if none of the catchers are active, bound key strings will be executed
 #define KEYCATCH_CONSOLE		0x0001
-#define	KEYCATCH_UI				0x0002
 #define	KEYCATCH_MESSAGE		0x0004
-#define	KEYCATCH_CGAME			0x0008
 
 
 // sound channels
@@ -1042,7 +1028,7 @@ typedef enum {
 	CA_CONNECTING,		// sending request packets to the server
 	CA_CHALLENGING,		// sending challenge packets to the server
 	CA_CONNECTED,		// netchan_t established, getting gamestate
-	CA_LOADING,			// only during cgame initialization, never during main loop
+	CA_LOADING,			// loading game state
 	CA_PRIMED,			// got gamestate, waiting for first frame
 	CA_ACTIVE,			// game views should be displayed
 	CA_CINEMATIC		// playing a cinematic or a static pic, not connected to a server

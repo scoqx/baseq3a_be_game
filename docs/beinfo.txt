@@ -1,0 +1,12 @@
+****************************************************
+******************  be  changes  *******************
+****************************************************
+
+======================== [OSP]
+getstatsinfo command
+
+    Added `getstatsinfo` command for OSP compatibility.
+    Client sends `getstatsinfo` request and receives response via `statsinfo` server command.
+    Allows +wstats to work in OSP(2) clients.
+
+========================
